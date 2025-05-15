@@ -1,0 +1,50 @@
+name: Release on Tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [darwin, linux, windows]
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build binary
+        run: |
+          ext=""
+          if [ "${{ matrix.os }}" = "windows" ]; then ext=".exe"; fi
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o mysql-restore-${{ matrix.os }}-${{ matrix.arch }}$ext
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mysql-restore-${{ matrix.os }}-${{ matrix.arch }}
+          path: mysql-restore-${{ matrix.os }}-${{ matrix.arch }}*
+
+  release-attach:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./artifacts/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
